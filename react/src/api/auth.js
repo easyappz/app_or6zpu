@@ -1,12 +1,14 @@
 import instance from './axios';
-import { ensurePath } from './openapi';
+import { ensureSpecReady } from './openapi';
 
-export async function login(payload) {
-  await ensurePath('post', '/api/auth/login');
-  return instance.post('/api/auth/login', payload);
+export async function registerUser(payload) {
+  await ensureSpecReady();
+  // POST /api/auth/register
+  return instance.post('/api/auth/register', payload);
 }
 
-export async function register(payload) {
-  await ensurePath('post', '/api/auth/register');
-  return instance.post('/api/auth/register', payload);
+export async function loginUser(payload) {
+  await ensureSpecReady();
+  // POST /api/auth/login
+  return instance.post('/api/auth/login', payload);
 }

@@ -1,28 +1,22 @@
 import yaml from 'js-yaml';
 
 let cachedSpec = null;
-let loadingPromise = null;
 
 export async function getSpec() {
   if (cachedSpec) return cachedSpec;
-  if (loadingPromise) return loadingPromise;
-  loadingPromise = fetch('/openapi.yml', { headers: { Accept: 'text/yaml, application/yaml, */*' } })
-    .then(async (res) => {
-      if (!res.ok) {
-        throw new Error(`Failed to load OpenAPI spec: ${res.status}`);
-      }
-      const text = await res.text();
-      const doc = yaml.load(text);
-      cachedSpec = doc;
-      return cachedSpec;
-    })
-    .finally(() => {
-      loadingPromise = null;
-    });
-  return loadingPromise;
+  const res = await fetch('/openapi.yml', { headers: { 'Accept': 'text/yaml, application/yaml, */*' } });
+  if (!res.ok) {
+    throw new Error(`Failed to load OpenAPI spec: ${res.status}`);
+  }
+  const text = await res.text();
+  cachedSpec = yaml.load(text);
+  return cachedSpec;
 }
 
-export function getPathFromSpec(path) {
-  if (!cachedSpec) return null;
-  return cachedSpec.paths?.[path] || null;
+export async function ensureSpecReady() {
+  try {
+    await getSpec();
+  } catch (e) {
+    console.error('OpenAPI spec load error:', e);
+  }
 }

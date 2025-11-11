@@ -1,62 +1,125 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { loginUser } from '../api/auth.js';
+import { extractAxiosErrors } from '../api/errors.js';
 
-function extractErrorMessage(err) {
-  const data = err?.response?.data;
-  if (data) {
-    if (typeof data.detail === 'string') return data.detail;
-    if (typeof data === 'object') {
-      const msgs = [];
-      for (const key of Object.keys(data)) {
-        const val = data[key];
-        if (Array.isArray(val)) {
-          for (const item of val) msgs.push(String(item));
-        } else if (typeof val === 'string') {
-          msgs.push(val);
-        }
-      }
-      if (msgs.length) return msgs.join(' ');
-    }
-  }
-  return 'Ошибка входа. Проверьте введённые данные.';
+function FieldError({ messages }) {
+  if (!messages || messages.length === 0) return null;
+  return (
+    <div style={{ color: '#c00', fontSize: 12, marginTop: 6 }}>
+      {messages.map((m, i) => (
+        <div key={i}>{m}</div>
+      ))}
+    </div>
+  );
 }
 
 export default function Login() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const { login, loading } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState({ nonField: [], fields: {} });
 
-  const onSubmit = async (e) => {
+  const registerSuccess = useMemo(() => location?.state?.registered === true, [location?.state]);
+
+  async function onSubmit(e) {
     e.preventDefault();
-    setError('');
+    setSubmitting(true);
+    setErrors({ nonField: [], fields: {} });
     try {
-      await login(email, password);
-      // Redirect is handled inside AuthContext.login -> '/profile'
+      const res = await loginUser({ email, password });
+      const { access, expires_in } = res.data || {};
+      if (access) {
+        localStorage.setItem('token', access);
+        if (typeof expires_in === 'number') {
+          localStorage.setItem('token_expires_at', String(Date.now() + expires_in * 1000));
+        }
+        try {
+          window.dispatchEvent(new CustomEvent('auth:changed'));
+        } catch (_) {}
+        navigate('/profile', { replace: true });
+      } else {
+        setErrors({ nonField: ['Не удалось получить токен доступа'], fields: {} });
+      }
     } catch (err) {
-      setError(extractErrorMessage(err));
+      const parsed = extractAxiosErrors(err);
+      setErrors({ nonField: parsed.nonField, fields: parsed.fields });
+    } finally {
+      setSubmitting(false);
     }
-  };
+  }
 
   return (
-    <section data-easytag="id8-src/pages/Login.jsx" style={{ maxWidth: 420, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 28, marginBottom: 16 }}>Вход</h1>
-      {error ? <div role="alert" style={{ color: '#b00020', marginBottom: 12 }}>{error}</div> : null}
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ height: 42, borderRadius: 8, border: '1px solid #ddd', padding: '0 12px' }} />
+    <div data-easytag="id10-src/pages/Login.jsx" style={{ maxWidth: 420, margin: '0 auto' }}>
+      <h1 style={{ margin: '8px 0 16px', fontWeight: 600 }}>Вход</h1>
+
+      {registerSuccess && (
+        <div style={{ background: '#eef9f0', border: '1px solid #c6efd1', padding: 12, borderRadius: 8, color: '#146c2e', marginBottom: 12 }}>
+          Регистрация успешна. Теперь войдите в аккаунт.
         </div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label htmlFor="password">Пароль</label>
-          <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ height: 42, borderRadius: 8, border: '1px solid #ddd', padding: '0 12px' }} />
+      )}
+
+      {errors.nonField.length > 0 && (
+        <div style={{ background: '#fff1f1', border: '1px solid #ffd0d0', padding: 12, borderRadius: 8, color: '#a70000', marginBottom: 12 }}>
+          {errors.nonField.map((m, i) => (
+            <div key={i}>{m}</div>
+          ))}
         </div>
-        <button type="submit" disabled={loading} style={{ height: 44, borderRadius: 10, border: '1px solid #000', background: '#000', color: '#fff', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
-          {loading ? 'Входим…' : 'Войти'}
+      )}
+
+      <form onSubmit={onSubmit} noValidate>
+        <label style={{ display: 'block', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, marginBottom: 6 }}>Email</div>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+            required
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #d0d0d0' }}
+          />
+          <FieldError messages={errors.fields.email} />
+        </label>
+
+        <label style={{ display: 'block', marginBottom: 16 }}>
+          <div style={{ fontSize: 14, marginBottom: 6 }}>Пароль</div>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••"
+            autoComplete="current-password"
+            required
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #d0d0d0' }}
+          />
+          <FieldError messages={errors.fields.password} />
+        </label>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            borderRadius: 12,
+            border: 'none',
+            background: '#111',
+            color: '#fff',
+            fontWeight: 600,
+            cursor: submitting ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {submitting ? 'Входим…' : 'Войти'}
         </button>
       </form>
-      <p style={{ marginTop: 12 }}>Нет аккаунта? <Link to="/register">Зарегистрируйтесь</Link></p>
-    </section>
+
+      <div style={{ marginTop: 16, textAlign: 'center', fontSize: 14 }}>
+        Нет аккаунта?{' '}
+        <Link to="/register" style={{ color: '#0070f3', textDecoration: 'none' }}>Зарегистрироваться</Link>
+      </div>
+    </div>
   );
 }

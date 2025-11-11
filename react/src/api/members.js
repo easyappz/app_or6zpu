@@ -1,7 +1,14 @@
 import instance from './axios';
+import { ensureSpecReady } from './openapi';
 
-// GET /api/members/me — as per openapi.yml
 export async function getMe() {
-  const res = await instance.get('/api/members/me');
-  return res.data;
+  await ensureSpecReady();
+  // GET /api/members/me
+  return instance.get('/api/members/me');
+}
+
+export async function updateMe(payload) {
+  await ensureSpecReady();
+  // PUT /api/members/me
+  return instance.put('/api/members/me', payload);
 }

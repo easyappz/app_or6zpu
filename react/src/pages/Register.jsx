@@ -1,79 +1,139 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { register as apiRegister } from '../api/auth';
-import { getSpec } from '../api/openapi';
+import { registerUser } from '../api/auth.js';
+import { extractAxiosErrors } from '../api/errors.js';
 
-function extractErrorMessage(err) {
-  const data = err?.response?.data;
-  if (data) {
-    if (typeof data.detail === 'string') return data.detail;
-    if (typeof data === 'object') {
-      const msgs = [];
-      for (const key of Object.keys(data)) {
-        const val = data[key];
-        if (Array.isArray(val)) {
-          for (const item of val) msgs.push(String(item));
-        } else if (typeof val === 'string') {
-          msgs.push(val);
-        }
-      }
-      if (msgs.length) return msgs.join(' ');
-    }
-  }
-  return 'Ошибка регистрации. Проверьте введённые данные.';
+function FieldError({ messages }) {
+  if (!messages || messages.length === 0) return null;
+  return (
+    <div style={{ color: '#c00', fontSize: 12, marginTop: 6 }}>
+      {messages.map((m, i) => (
+        <div key={i}>{m}</div>
+      ))}
+    </div>
+  );
 }
 
 export default function Register() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState({ nonField: [], fields: {} });
 
-  const onSubmit = async (e) => {
+  function updateField(key, value) {
+    setForm((p) => ({ ...p, [key]: value }));
+  }
+
+  async function onSubmit(e) {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setSubmitting(true);
+    setErrors({ nonField: [], fields: {} });
     try {
-      // ensure OpenAPI is available (non-blocking behavior is inside function)
-      await getSpec();
-      await apiRegister({ name, email, phone, password });
-      navigate('/login', { replace: true });
+      await registerUser({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+      });
+      navigate('/login', { replace: true, state: { registered: true } });
     } catch (err) {
-      setError(extractErrorMessage(err));
+      const parsed = extractAxiosErrors(err);
+      setErrors({ nonField: parsed.nonField, fields: parsed.fields });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
-  };
+  }
 
   return (
-    <section data-easytag="id9-src/pages/Register.jsx" style={{ maxWidth: 480, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 28, marginBottom: 16 }}>Регистрация</h1>
-      {error ? <div role="alert" style={{ color: '#b00020', marginBottom: 12 }}>{error}</div> : null}
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label htmlFor="name">Имя</label>
-          <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} required style={{ height: 42, borderRadius: 8, border: '1px solid #ddd', padding: '0 12px' }} />
+    <div data-easytag="id11-src/pages/Register.jsx" style={{ maxWidth: 520, margin: '0 auto' }}>
+      <h1 style={{ margin: '8px 0 16px', fontWeight: 600 }}>Регистрация</h1>
+
+      {errors.nonField.length > 0 && (
+        <div style={{ background: '#fff1f1', border: '1px solid #ffd0d0', padding: 12, borderRadius: 8, color: '#a70000', marginBottom: 12 }}>
+          {errors.nonField.map((m, i) => (
+            <div key={i}>{m}</div>
+          ))}
         </div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ height: 42, borderRadius: 8, border: '1px solid #ddd', padding: '0 12px' }} />
-        </div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label htmlFor="phone">Телефон</label>
-          <input id="phone" type="text" value={phone} onChange={(e) => setPhone(e.target.value)} required style={{ height: 42, borderRadius: 8, border: '1px solid #ddd', padding: '0 12px' }} />
-        </div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label htmlFor="password">Пароль</label>
-          <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ height: 42, borderRadius: 8, border: '1px solid #ddd', padding: '0 12px' }} />
-        </div>
-        <button type="submit" disabled={loading} style={{ height: 44, borderRadius: 10, border: '1px solid #000', background: '#000', color: '#fff', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
-          {loading ? 'Создаём…' : 'Создать аккаунт'}
+      )}
+
+      <form onSubmit={onSubmit} noValidate>
+        <label style={{ display: 'block', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, marginBottom: 6 }}>Имя</div>
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => updateField('name', e.target.value)}
+            placeholder="Иван"
+            required
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #d0d0d0' }}
+          />
+          <FieldError messages={errors.fields.name} />
+        </label>
+
+        <label style={{ display: 'block', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, marginBottom: 6 }}>Email</div>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => updateField('email', e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+            required
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #d0d0d0' }}
+          />
+          <FieldError messages={errors.fields.email} />
+        </label>
+
+        <label style={{ display: 'block', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, marginBottom: 6 }}>Телефон</div>
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={(e) => updateField('phone', e.target.value)}
+            placeholder="+7 900 000-00-00"
+            autoComplete="tel"
+            required
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #d0d0d0' }}
+          />
+          <FieldError messages={errors.fields.phone} />
+        </label>
+
+        <label style={{ display: 'block', marginBottom: 16 }}>
+          <div style={{ fontSize: 14, marginBottom: 6 }}>Пароль</div>
+          <input
+            type="password"
+            value={form.password}
+            onChange={(e) => updateField('password', e.target.value)}
+            placeholder="Минимум 6 символов"
+            autoComplete="new-password"
+            required
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #d0d0d0' }}
+          />
+          <FieldError messages={errors.fields.password} />
+        </label>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            borderRadius: 12,
+            border: 'none',
+            background: '#111',
+            color: '#fff',
+            fontWeight: 600,
+            cursor: submitting ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {submitting ? 'Регистрируем…' : 'Зарегистрироваться'}
         </button>
       </form>
-      <p style={{ marginTop: 12 }}>Уже есть аккаунт? <Link to="/login">Войти</Link></p>
-    </section>
+
+      <div style={{ marginTop: 16, textAlign: 'center', fontSize: 14 }}>
+        Уже есть аккаунт?{' '}
+        <Link to="/login" style={{ color: '#0070f3', textDecoration: 'none' }}>Войти</Link>
+      </div>
+    </div>
   );
 }
