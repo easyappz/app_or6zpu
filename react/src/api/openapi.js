@@ -14,6 +14,10 @@ export async function getSpec() {
   return spec;
 }
 
+export async function ensureSpecReady() {
+  return getSpec();
+}
+
 function findOperation(spec, matchFn) {
   const paths = spec.paths || {};
   const methods = ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'];
