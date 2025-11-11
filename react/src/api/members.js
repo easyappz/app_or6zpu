@@ -1,7 +1,7 @@
 import instance from './axios';
-import { ensurePath } from './openapi';
 
+// GET /api/members/me — as per openapi.yml
 export async function getMe() {
-  await ensurePath('get', '/api/members/me');
-  return instance.get('/api/members/me');
+  const res = await instance.get('/api/members/me');
+  return res.data;
 }
