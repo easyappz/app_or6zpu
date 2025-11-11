@@ -1,23 +1,41 @@
 import React, { useState } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+
+function extractErrorMessage(err) {
+  const data = err?.response?.data;
+  if (data) {
+    if (typeof data.detail === 'string') return data.detail;
+    if (typeof data === 'object') {
+      const msgs = [];
+      for (const key of Object.keys(data)) {
+        const val = data[key];
+        if (Array.isArray(val)) {
+          for (const item of val) msgs.push(String(item));
+        } else if (typeof val === 'string') {
+          msgs.push(val);
+        }
+      }
+      if (msgs.length) return msgs.join(' ');
+    }
+  }
+  return 'Ошибка входа. Проверьте введённые данные.';
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { login, loading } = useAuth();
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      // Placeholder auth: store dummy token to unlock protected routes
-      localStorage.setItem('accessToken', 'demo');
-      const to = location.state?.from?.pathname || '/profile';
-      navigate(to, { replace: true });
+      await login(email, password);
+      // Redirect is handled inside AuthContext.login -> '/profile'
     } catch (err) {
-      setError('Ошибка входа.');
+      setError(extractErrorMessage(err));
     }
   };
 
@@ -34,7 +52,9 @@ export default function Login() {
           <label htmlFor="password">Пароль</label>
           <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ height: 42, borderRadius: 8, border: '1px solid #ddd', padding: '0 12px' }} />
         </div>
-        <button type="submit" style={{ height: 44, borderRadius: 10, border: '1px solid #000', background: '#000', color: '#fff', cursor: 'pointer' }}>Войти</button>
+        <button type="submit" disabled={loading} style={{ height: 44, borderRadius: 10, border: '1px solid #000', background: '#000', color: '#fff', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Входим…' : 'Войти'}
+        </button>
       </form>
       <p style={{ marginTop: 12 }}>Нет аккаунта? <Link to="/register">Зарегистрируйтесь</Link></p>
     </section>

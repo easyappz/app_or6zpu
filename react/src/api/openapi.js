@@ -1,51 +1,25 @@
-/* OpenAPI spec loader: fetch once on app init and cache */
-let cachedSpec = null;
-let loadingPromise = null;
+import yaml from 'js-yaml';
 
-const OPENAPI_SPEC_URL = '/openapi.yml';
+let specPromise = null;
 
-async function loadSpecOnce() {
-  if (cachedSpec) {
-    return cachedSpec;
+export function getSpec() {
+  if (!specPromise) {
+    specPromise = fetch('/openapi.yml', { cache: 'no-store' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load OpenAPI spec: ${res.status}`);
+        return res.text();
+      })
+      .then((text) => yaml.load(text));
   }
-  if (loadingPromise) {
-    return loadingPromise;
-  }
-
-  loadingPromise = fetch(OPENAPI_SPEC_URL, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/yaml, text/yaml, text/plain, */*',
-    },
-    cache: 'no-store',
-  })
-    .then(async (res) => {
-      if (!res.ok) {
-        throw new Error(`Failed to fetch OpenAPI spec: ${res.status}`);
-      }
-      const raw = await res.text();
-
-      // Optional: try parse if a YAML parser is available globally (we don't add deps here)
-      let parsed = null;
-      try {
-        if (typeof window !== 'undefined' && window.YAML && typeof window.YAML.parse === 'function') {
-          parsed = window.YAML.parse(raw);
-        }
-      } catch (e) {
-        parsed = null;
-      }
-
-      cachedSpec = { raw, parsed };
-      return cachedSpec;
-    })
-    .finally(() => {
-      // Keep cachedSpec but clear the in-flight promise
-      loadingPromise = null;
-    });
-
-  return loadingPromise;
+  return specPromise;
 }
 
-export async function getSpec() {
-  return loadSpecOnce();
+export async function ensurePath(method, path) {
+  const spec = await getSpec();
+  const entry = spec?.paths?.[path]?.[method.toLowerCase()];
+  if (!entry) {
+    // Not throwing to avoid blocking UI in dev, but warn loudly
+    console.warn(`Path ${method.toUpperCase()} ${path} not found in OpenAPI spec`);
+  }
+  return spec;
 }

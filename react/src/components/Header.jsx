@@ -1,30 +1,10 @@
-import React, { useMemo } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-
-function useAuth() {
-  const isAuthed = useMemo(() => {
-    try {
-      return Boolean(localStorage.getItem('accessToken'));
-    } catch (e) {
-      return false;
-    }
-  }, []);
-  return { isAuthed };
-}
+import React from 'react';
+import { Link, NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Header() {
-  const { isAuthed } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-    } catch (e) {
-      // ignore
-    }
-    navigate('/');
-  };
+  const { token, logout } = useAuth();
+  const isAuthed = Boolean(token);
 
   const linkStyle = ({ isActive }) => ({
     color: isActive ? '#000' : '#333',
@@ -67,7 +47,7 @@ export default function Header() {
             <NavLink to="/my" style={linkStyle}>Мои объявления</NavLink>
             <NavLink to="/favorites" style={linkStyle}>Избранное</NavLink>
             <NavLink to="/profile" style={linkStyle}>Профиль</NavLink>
-            <button type="button" onClick={handleLogout} style={{
+            <button type="button" onClick={logout} style={{
               marginLeft: 8,
               padding: '8px 12px',
               border: '1px solid #ddd',

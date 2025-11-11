@@ -1,25 +1,12 @@
-import { getSpec, findOperationPath, requestBySpec } from './spec';
+import instance from './axios';
+import { ensurePath } from './openapi';
 
-// Auth: register
-export async function register(payload) {
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Auth',
-    method: 'post',
-    summary: 'Регистрация нового пользователя',
-  });
-  const res = await requestBySpec({ method: 'post', path, body: payload, op });
-  return res.data;
+export async function login(payload) {
+  await ensurePath('post', '/api/auth/login');
+  return instance.post('/api/auth/login', payload);
 }
 
-// Auth: login
-export async function login(payload) {
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Auth',
-    method: 'post',
-    summary: 'Вход по email и паролю',
-  });
-  const res = await requestBySpec({ method: 'post', path, body: payload, op });
-  return res.data;
+export async function register(payload) {
+  await ensurePath('post', '/api/auth/register');
+  return instance.post('/api/auth/register', payload);
 }

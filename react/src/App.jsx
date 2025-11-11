@@ -2,6 +2,9 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
+// Context
+import { AuthProvider } from './context/AuthContext.jsx';
+
 // Components
 import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
@@ -40,26 +43,28 @@ function App() {
   return (
     <div data-easytag="id0-src/App.jsx" className="App" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       <BrowserRouter>
-        <Header />
-        <main style={{ flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+        <AuthProvider>
+          <Header />
+          <main style={{ flex: 1, width: '100%', maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-            <Route element={<ProtectedRoute />}> 
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/ads/new" element={<AdNew />} />
-              <Route path="/ads/:id/edit" element={<AdEdit />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/my" element={<MyAds />} />
-            </Route>
+              <Route element={<ProtectedRoute />}> 
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/ads/new" element={<AdNew />} />
+                <Route path="/ads/:id/edit" element={<AdEdit />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/my" element={<MyAds />} />
+              </Route>
 
-            <Route path="/ads/:id" element={<AdView />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
-        <Footer />
+              <Route path="/ads/:id" element={<AdView />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+          <Footer />
+        </AuthProvider>
       </BrowserRouter>
     </div>
   );
