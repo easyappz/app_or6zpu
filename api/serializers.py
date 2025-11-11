@@ -1,6 +1,217 @@
+from typing import Any, Dict, Optional
+
+from django.contrib.auth.hashers import check_password, make_password
 from rest_framework import serializers
+
+from .models import Ad, Category, Favorite, Member
 
 
 class MessageSerializer(serializers.Serializer):
     message = serializers.CharField(max_length=200)
     timestamp = serializers.DateTimeField(read_only=True)
+
+
+# --------------------
+# Member serializers
+# --------------------
+class MemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Member
+        fields = [
+            "id",
+            "name",
+            "email",
+            "phone",
+            "avatar_url",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class MemberUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Member
+        fields = ["name", "phone", "avatar_url"]
+
+    def validate_phone(self, value: str) -> str:
+        member: Optional[Member] = self.instance
+        qs = Member.objects.filter(phone=value)
+        if member is not None:
+            qs = qs.exclude(pk=member.pk)
+        if qs.exists():
+            raise serializers.ValidationError("Пользователь с таким телефоном уже существует.")
+        return value
+
+
+class RegisterSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=120, error_messages={
+        "blank": "Имя не может быть пустым.",
+        "required": "Поле 'name' обязательно.",
+    })
+    email = serializers.EmailField(error_messages={
+        "invalid": "Введите корректный email.",
+        "blank": "Email не может быть пустым.",
+        "required": "Поле 'email' обязательно.",
+    })
+    phone = serializers.CharField(max_length=32, error_messages={
+        "blank": "Телефон не может быть пустым.",
+        "required": "Поле 'phone' обязательно.",
+    })
+    password = serializers.CharField(write_only=True, min_length=6, error_messages={
+        "blank": "Пароль не может быть пустым.",
+        "required": "Поле 'password' обязательно.",
+        "min_length": "Минимальная длина пароля: 6 символов.",
+    })
+
+    def validate_email(self, value: str) -> str:
+        if Member.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Пользователь с таким email уже существует.")
+        return value
+
+    def validate_phone(self, value: str) -> str:
+        if Member.objects.filter(phone=value).exists():
+            raise serializers.ValidationError("Пользователь с таким телефоном уже существует.")
+        return value
+
+    def create(self, validated_data: Dict[str, Any]) -> Member:
+        password = validated_data.pop("password")
+        member = Member(**validated_data)
+        member.password_hash = make_password(password)
+        member.save()
+        return member
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(error_messages={
+        "invalid": "Введите корректный email.",
+        "blank": "Email не может быть пустым.",
+        "required": "Поле 'email' обязательно.",
+    })
+    password = serializers.CharField(write_only=True, error_messages={
+        "blank": "Пароль не может быть пустым.",
+        "required": "Поле 'password' обязательно.",
+    })
+
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
+        email = attrs.get("email")
+        password = attrs.get("password")
+        try:
+            member = Member.objects.get(email=email)
+        except Member.DoesNotExist:
+            raise serializers.ValidationError("Неверный email или пароль.")
+
+        if not check_password(password, member.password_hash):
+            raise serializers.ValidationError("Неверный email или пароль.")
+
+        attrs["member"] = member
+        return attrs
+
+
+# --------------------
+# Category serializers
+# --------------------
+class CategorySerializer(serializers.ModelSerializer):
+    parent = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), allow_null=True, required=False
+    )
+
+    class Meta:
+        model = Category
+        fields = ["id", "name", "slug", "parent"]
+        read_only_fields = ["id"]
+
+
+# --------------------
+# Ad serializers
+# --------------------
+class AdSerializer(serializers.ModelSerializer):
+    owner = serializers.PrimaryKeyRelatedField(read_only=True)
+    category = serializers.PrimaryKeyRelatedField(read_only=True)
+    is_favorite = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Ad
+        fields = [
+            "id",
+            "owner",
+            "category",
+            "title",
+            "description",
+            "price",
+            "photos",
+            "location",
+            "contact",
+            "condition",
+            "created_at",
+            "updated_at",
+            "is_favorite",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "is_favorite"]
+
+    def get_is_favorite(self, obj: Ad) -> bool:
+        request = self.context.get("request")
+        if not request:
+            return False
+
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+
+        # Attempt to resolve member id for favorite lookup
+        member_id: Optional[int] = None
+        if isinstance(user, Member):
+            member_id = user.id
+        else:
+            member_id = getattr(user, "member_id", None)
+            if member_id is None:
+                email = getattr(user, "email", None)
+                if email:
+                    member = Member.objects.filter(email=email).only("id").first()
+                    member_id = member.id if member else None
+
+        if not member_id:
+            return False
+
+        return Favorite.objects.filter(member_id=member_id, ad_id=obj.id).exists()
+
+
+class AdCreateUpdateSerializer(serializers.ModelSerializer):
+    owner = serializers.PrimaryKeyRelatedField(queryset=Member.objects.all(), error_messages={
+        "does_not_exist": "Указанный владелец не найден.",
+        "required": "Поле 'owner' обязательно.",
+    })
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), error_messages={
+        "does_not_exist": "Указанная категория не найдена.",
+        "required": "Поле 'category' обязательно.",
+    })
+
+    class Meta:
+        model = Ad
+        fields = [
+            "owner",
+            "category",
+            "title",
+            "description",
+            "price",
+            "photos",
+            "location",
+            "contact",
+            "condition",
+        ]
+
+    def validate_price(self, value):
+        if value is None:
+            raise serializers.ValidationError("Цена обязательна для заполнения.")
+        if value < 0:
+            raise serializers.ValidationError("Цена не может быть отрицательной.")
+        return value
+
+    def validate_photos(self, value):
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Поле 'photos' должно быть списком строк (URL).")
+        for idx, item in enumerate(value):
+            if not isinstance(item, str) or not item:
+                raise serializers.ValidationError(f"Элемент photos[{idx}] должен быть непустой строкой.")
+        return value
