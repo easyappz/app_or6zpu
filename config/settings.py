@@ -171,3 +171,7 @@ STATIC_URL = "django_static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# JWT settings
+JWT_ALGORITHM = "HS256"
+JWT_ACCESS_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days

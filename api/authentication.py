@@ -1,79 +1,58 @@
-from __future__ import annotations
+from typing import Optional, Tuple
 
-from typing import Any, Optional, Tuple
-
-from django.http import HttpRequest
-from rest_framework.authentication import BaseAuthentication
-from rest_framework.exceptions import AuthenticationFailed
+import jwt
+from django.conf import settings
+from rest_framework import exceptions
+from rest_framework.authentication import BaseAuthentication, get_authorization_header
 
 from .models import Member
-from .security import jwt_decode
 
 
-class AuthenticatedMember:
-    """Lightweight wrapper so DRF treats the request as authenticated."""
+class AuthUser:
+    """Lightweight wrapper for Member to satisfy DRF's user interface."""
 
-    def __init__(self, member: Member):
-        self._member = member
-        # Expose common attributes directly for convenience
-        self.id = getattr(member, "id", None)
-        self.pk = getattr(member, "pk", None)
-        self.email = getattr(member, "email", None)
-        self.name = getattr(member, "name", None)
+    def __init__(self, member: Member) -> None:
+        self.member = member
+        self.id = member.id
+        self.email = member.email
 
     @property
-    def is_authenticated(self) -> bool:  # DRF checks this property
+    def is_authenticated(self) -> bool:  # type: ignore[override]
         return True
 
-    @property
-    def member(self) -> Member:
-        return self._member
-
     def __str__(self) -> str:
-        base = getattr(self._member, "name", None) or getattr(self._member, "email", None) or f"Member#{self.id}"
-        return f"AuthenticatedMember({base})"
+        return f"AuthUser(member_id={self.id})"
 
 
 class MemberJWTAuthentication(BaseAuthentication):
-    """
-    DRF authentication class for Member via JWT in Authorization header.
+    keyword = b"bearer"
 
-    Expected header: `Authorization: Bearer <token>`
-    """
-
-    keyword = "Bearer"
-
-    def authenticate(self, request: HttpRequest) -> Optional[Tuple[AuthenticatedMember, str]]:
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            # No credentials provided. Return None to allow anonymous access where permitted.
+    def authenticate(self, request) -> Optional[Tuple[AuthUser, str]]:  # type: ignore[override]
+        auth = get_authorization_header(request).split()
+        if not auth:
             return None
 
-        parts = auth_header.split(" ")
-        if len(parts) != 2 or parts[0].lower() != self.keyword.lower():
-            raise AuthenticationFailed("Неверная схема авторизации. Используйте 'Bearer <token>'.")
+        if len(auth) != 2 or auth[0].lower() != self.keyword:
+            raise exceptions.AuthenticationFailed("Invalid Authorization header.")
 
-        token = parts[1].strip()
-        if not token:
-            raise AuthenticationFailed("Токен отсутствует в заголовке Authorization.")
+        token = auth[1].decode("utf-8")
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[getattr(settings, "JWT_ALGORITHM", "HS256")])
+        except jwt.ExpiredSignatureError:
+            raise exceptions.AuthenticationFailed("Token expired.")
+        except jwt.InvalidTokenError:
+            raise exceptions.AuthenticationFailed("Invalid token.")
+
+        if payload.get("type") != "access":
+            raise exceptions.AuthenticationFailed("Invalid token type.")
+
+        member_id = payload.get("sub")
+        if not member_id:
+            raise exceptions.AuthenticationFailed("Invalid token payload.")
 
         try:
-            payload = jwt_decode(token)
-        except Exception as exc:  # PyJWT raises specific subclasses; we map all to a clear message
-            raise AuthenticationFailed("Недействительный токен или истек срок его действия. Выполните вход снова.") from exc
+            member = Member.objects.get(pk=member_id)
+        except Member.DoesNotExist:
+            raise exceptions.AuthenticationFailed("User not found.")
 
-        member_id = payload.get("member_id") or payload.get("sub")
-        if member_id is None:
-            raise AuthenticationFailed("Токен не содержит идентификатора пользователя (member_id или sub).")
-
-        try:
-            member = Member.objects.filter(id=member_id).first()
-        except Exception as exc:
-            raise AuthenticationFailed("Ошибка при загрузке пользователя.") from exc
-
-        if not member:
-            raise AuthenticationFailed("Пользователь не найден или был удалён.")
-
-        user = AuthenticatedMember(member)
-        # DRF expects (user, auth); auth may be token string or payload
-        return user, token
+        return AuthUser(member), token

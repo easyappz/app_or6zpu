@@ -111,30 +111,26 @@ class LoginSerializer(serializers.Serializer):
 # Category serializers
 # --------------------
 class CategorySerializer(serializers.ModelSerializer):
-    parent = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), allow_null=True, required=False
-    )
+    parent_id = serializers.IntegerField(source="parent_id", read_only=True)
 
     class Meta:
         model = Category
-        fields = ["id", "name", "slug", "parent"]
-        read_only_fields = ["id"]
+        fields = ["id", "name", "slug", "parent_id"]
+        read_only_fields = ["id", "parent_id"]
 
 
 # --------------------
 # Ad serializers
 # --------------------
 class AdSerializer(serializers.ModelSerializer):
-    owner = serializers.PrimaryKeyRelatedField(read_only=True)
-    category = serializers.PrimaryKeyRelatedField(read_only=True)
+    owner_id = serializers.IntegerField(source="owner_id", read_only=True)
+    category_id = serializers.IntegerField(source="category_id", read_only=True)
     is_favorite = serializers.SerializerMethodField()
 
     class Meta:
         model = Ad
         fields = [
             "id",
-            "owner",
-            "category",
             "title",
             "description",
             "price",
@@ -142,54 +138,43 @@ class AdSerializer(serializers.ModelSerializer):
             "location",
             "contact",
             "condition",
+            "category_id",
+            "owner_id",
+            "is_favorite",
             "created_at",
             "updated_at",
-            "is_favorite",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "is_favorite"]
+        read_only_fields = [
+            "id",
+            "owner_id",
+            "category_id",
+            "is_favorite",
+            "created_at",
+            "updated_at",
+        ]
 
     def get_is_favorite(self, obj: Ad) -> bool:
         request = self.context.get("request")
         if not request:
             return False
-
         user = getattr(request, "user", None)
-        if not user or not getattr(user, "is_authenticated", False):
+        member = getattr(user, "member", None)
+        if not member:
             return False
-
-        # Attempt to resolve member id for favorite lookup
-        member_id: Optional[int] = None
-        if isinstance(user, Member):
-            member_id = user.id
-        else:
-            member_id = getattr(user, "member_id", None)
-            if member_id is None:
-                email = getattr(user, "email", None)
-                if email:
-                    member = Member.objects.filter(email=email).only("id").first()
-                    member_id = member.id if member else None
-
-        if not member_id:
-            return False
-
-        return Favorite.objects.filter(member_id=member_id, ad_id=obj.id).exists()
+        return Favorite.objects.filter(member_id=member.id, ad_id=obj.id).exists()
 
 
 class AdCreateUpdateSerializer(serializers.ModelSerializer):
-    owner = serializers.PrimaryKeyRelatedField(queryset=Member.objects.all(), error_messages={
-        "does_not_exist": "Указанный владелец не найден.",
-        "required": "Поле 'owner' обязательно.",
-    })
-    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), error_messages={
-        "does_not_exist": "Указанная категория не найдена.",
-        "required": "Поле 'category' обязательно.",
-    })
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), source="category", error_messages={
+            "does_not_exist": "Указанная категория не найдена.",
+            "required": "Поле 'category_id' обязательно.",
+        }
+    )
 
     class Meta:
         model = Ad
         fields = [
-            "owner",
-            "category",
             "title",
             "description",
             "price",
@@ -197,6 +182,7 @@ class AdCreateUpdateSerializer(serializers.ModelSerializer):
             "location",
             "contact",
             "condition",
+            "category_id",
         ]
 
     def validate_price(self, value):
