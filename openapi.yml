@@ -16,18 +16,46 @@ tags:
     description: Категории объявлений
   - name: Ads
     description: Управление объявлениями и поиск
+  - name: Utils
+    description: Вспомогательные эндпоинты (проверка работы API)
 paths:
+  /api/hello/:
+    get:
+      tags: [Utils]
+      summary: Проверка API
+      description: Возвращает тестовое сообщение и метку времени. Публичный доступ.
+      responses:
+        '200':
+          description: Сообщение об успешной проверке
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              examples:
+                ok:
+                  summary: Пример успешного ответа
+                  value:
+                    message: "Hello!"
+                    timestamp: "2025-11-11T10:00:00Z"
   /api/auth/register:
     post:
       tags: [Auth]
       summary: Регистрация нового пользователя
-      description: Создаёт учетную запись. Авторизация не требуется.
+      description: Создаёт участника (Member). Авторизация не требуется.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AuthRegisterRequest'
+            examples:
+              sample:
+                summary: Пример запроса
+                value:
+                  name: "Иван"
+                  email: "ivan@example.com"
+                  phone: "+7 900 000-00-00"
+                  password: "secret123"
       responses:
         '201':
           description: Пользователь создан
@@ -40,8 +68,20 @@ paths:
                     type: string
                     description: Сообщение об успешной регистрации
                 required: [message]
+              examples:
+                created:
+                  value:
+                    message: "Регистрация успешна"
         '400':
           description: Ошибка валидации входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              examples:
+                email_exists:
+                  value:
+                    email: ["Пользователь с таким email уже существует."]
   /api/auth/login:
     post:
       tags: [Auth]
@@ -53,6 +93,11 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AuthLoginRequest'
+            examples:
+              sample:
+                value:
+                  email: "ivan@example.com"
+                  password: "secret123"
       responses:
         '200':
           description: Успешная аутентификация
@@ -60,8 +105,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokenResponse'
-        '401':
-          description: Неверные учётные данные
+              examples:
+                ok:
+                  value:
+                    access: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    token_type: "bearer"
+                    expires_in: 604800
+        '400':
+          description: Неверные учётные данные или ошибки валидации
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/ErrorDetail'
+              examples:
+                bad_creds:
+                  value:
+                    non_field_errors: ["Неверный email или пароль."]
   /api/members/me:
     get:
       tags: [Members]
@@ -78,6 +139,14 @@ paths:
                 $ref: '#/components/schemas/Member'
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              examples:
+                no_token:
+                  value:
+                    detail: "Требуется авторизация"
     put:
       tags: [Members]
       summary: Обновить профиль
@@ -90,6 +159,12 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/MemberUpdate'
+            examples:
+              sample:
+                value:
+                  name: "Иван Петров"
+                  phone: "+7 900 111-22-33"
+                  avatar_url: "https://example.com/a.png"
       responses:
         '200':
           description: Обновлённый профиль
@@ -97,8 +172,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Member'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              examples:
+                phone_taken:
+                  value:
+                    phone: ["Пользователь с таким телефоном уже существует."]
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
   /api/categories:
     get:
       tags: [Categories]
@@ -113,6 +202,34 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Category'
+  /api/categories/{pk}:
+    get:
+      tags: [Categories]
+      summary: Получить категорию
+      description: Публичное получение одной категории по ID.
+      parameters:
+        - in: path
+          name: pk
+          required: true
+          schema: { type: integer }
+          description: Идентификатор категории
+      responses:
+        '200':
+          description: Категория
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              examples:
+                not_found:
+                  value:
+                    detail: "Не найдено"
   /api/ads:
     get:
       tags: [Ads]
@@ -133,12 +250,12 @@ paths:
           description: Фильтр по категории
         - in: query
           name: price_min
-          schema: { type: number, format: float, minimum: 0 }
-          description: Минимальная цена
+          schema: { type: string }
+          description: Минимальная цена (десятичное число)
         - in: query
           name: price_max
-          schema: { type: number, format: float, minimum: 0 }
-          description: Максимальная цена
+          schema: { type: string }
+          description: Максимальная цена (десятичное число)
         - in: query
           name: date_from
           schema: { type: string, format: date }
@@ -168,6 +285,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedAdList'
+              examples:
+                page1:
+                  value:
+                    count: 1
+                    next: null
+                    previous: null
+                    results:
+                      - id: 1
+                        title: "iPhone 13"
+                        description: "Состояние отличное"
+                        price: "699.00"
+                        photos: []
+                        location: "Москва"
+                        contact: "+7 900 000-00-00"
+                        condition: "like_new"
+                        category_id: 2
+                        owner_id: 10
+                        is_favorite: false
+                        created_at: "2025-10-01T12:00:00Z"
+                        updated_at: "2025-10-02T12:00:00Z"
     post:
       tags: [Ads]
       summary: Создать объявление
@@ -180,6 +317,17 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AdCreate'
+            examples:
+              sample:
+                value:
+                  title: "MacBook Air M2"
+                  description: "Почти новый"
+                  price: "999.99"
+                  photos: ["https://example.com/1.jpg"]
+                  location: "Санкт-Петербург"
+                  contact: "+7 900 111-22-33"
+                  condition: "like_new"
+                  category_id: 3
       responses:
         '201':
           description: Объявление создано
@@ -187,16 +335,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ad'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              examples:
+                no_category:
+                  value:
+                    category_id: ["Указанная категория не найдена."]
         '401':
           description: Требуется авторизация
-  /api/ads/{id}:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              examples:
+                no_auth:
+                  value:
+                    detail: "Требуется авторизация"
+  /api/ads/{pk}:
     get:
       tags: [Ads]
       summary: Получить объявление
       description: Публичное получение одного объявления по ID.
       parameters:
         - in: path
-          name: id
+          name: pk
           required: true
           schema: { type: integer }
           description: Идентификатор объявления
@@ -209,6 +375,14 @@ paths:
                 $ref: '#/components/schemas/Ad'
         '404':
           description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              examples:
+                not_found:
+                  value:
+                    detail: "Не найдено"
     put:
       tags: [Ads]
       summary: Обновить объявление
@@ -217,7 +391,7 @@ paths:
         - bearerAuth: []
       parameters:
         - in: path
-          name: id
+          name: pk
           required: true
           schema: { type: integer }
           description: Идентификатор объявления
@@ -234,12 +408,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ad'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
         '403':
           description: Нет прав (не владелец)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              examples:
+                not_owner:
+                  value:
+                    detail: "Нет прав"
         '404':
           description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
     delete:
       tags: [Ads]
       summary: Удалить объявление
@@ -248,7 +444,7 @@ paths:
         - bearerAuth: []
       parameters:
         - in: path
-          name: id
+          name: pk
           required: true
           schema: { type: integer }
           description: Идентификатор объявления
@@ -257,11 +453,23 @@ paths:
           description: Удалено, без содержимого
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
         '403':
           description: Нет прав (не владелец)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
         '404':
           description: Не найдено
-  /api/ads/{id}/favorite:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+  /api/ads/{pk}/favorite:
     post:
       tags: [Ads]
       summary: Добавить в избранное
@@ -270,7 +478,7 @@ paths:
         - bearerAuth: []
       parameters:
         - in: path
-          name: id
+          name: pk
           required: true
           schema: { type: integer }
           description: Идентификатор объявления
@@ -279,8 +487,16 @@ paths:
           description: Добавлено в избранное (без содержимого)
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
         '404':
           description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
     delete:
       tags: [Ads]
       summary: Удалить из избранного
@@ -289,7 +505,7 @@ paths:
         - bearerAuth: []
       parameters:
         - in: path
-          name: id
+          name: pk
           required: true
           schema: { type: integer }
           description: Идентификатор объявления
@@ -298,8 +514,16 @@ paths:
           description: Удалено из избранного (без содержимого)
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
         '404':
           description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
   /api/members/me/ads:
     get:
       tags: [Members]
@@ -325,6 +549,10 @@ paths:
                 $ref: '#/components/schemas/PaginatedAdList'
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
   /api/members/me/favorites:
     get:
       tags: [Members]
@@ -350,6 +578,10 @@ paths:
                 $ref: '#/components/schemas/PaginatedAdList'
         '401':
           description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
 components:
   securitySchemes:
     bearerAuth:
@@ -357,6 +589,35 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    Message:
+      type: object
+      description: Простое сообщение с меткой времени
+      properties:
+        message:
+          type: string
+          description: Текст сообщения
+        timestamp:
+          type: string
+          format: date-time
+          description: Время формирования ответа (UTC)
+      required: [message, timestamp]
+    ErrorDetail:
+      type: object
+      description: Сообщение об ошибке
+      properties:
+        detail:
+          type: string
+          description: Текст ошибки
+      required: [detail]
+    ValidationError:
+      type: object
+      description: Ошибки валидации по полям
+      additionalProperties:
+        type: array
+        items:
+          type: string
+      example:
+        email: ["Введите корректный email."]
     Member:
       type: object
       description: Участник (профиль пользователя)
@@ -378,15 +639,13 @@ components:
           description: Телефон
         avatar_url:
           type: string
-          format: uri
-          nullable: true
           description: URL аватара
         created_at:
           type: string
           format: date-time
           description: Дата создания профиля
           readOnly: true
-      required: [id, name, email, created_at]
+      required: [id, name, email, phone, avatar_url, created_at]
     MemberUpdate:
       type: object
       description: Поля для обновления профиля
@@ -399,8 +658,6 @@ components:
           description: Телефон
         avatar_url:
           type: string
-          format: uri
-          nullable: true
           description: URL аватара
     AuthRegisterRequest:
       type: object
@@ -487,16 +744,13 @@ components:
           type: string
           description: Описание
         price:
-          type: number
-          format: float
-          minimum: 0
-          description: Цена
+          type: string
+          description: Цена (десятичное число, два знака после запятой)
         photos:
           type: array
-          description: Список URL фотографий
+          description: Список ссылок на фотографии (строки)
           items:
             type: string
-            format: uri
         location:
           type: string
           description: Местоположение
@@ -555,16 +809,13 @@ components:
           type: string
           description: Описание
         price:
-          type: number
-          format: float
-          minimum: 0
-          description: Цена
+          type: string
+          description: Цена (десятичное число)
         photos:
           type: array
-          description: Список URL фотографий
+          description: Список ссылок на фотографии (строки)
           items:
             type: string
-            format: uri
         location:
           type: string
           description: Местоположение
@@ -598,16 +849,13 @@ components:
           type: string
           description: Описание
         price:
-          type: number
-          format: float
-          minimum: 0
-          description: Цена
+          type: string
+          description: Цена (десятичное число)
         photos:
           type: array
-          description: Список URL фотографий
+          description: Список ссылок на фотографии (строки)
           items:
             type: string
-            format: uri
         location:
           type: string
           description: Местоположение
