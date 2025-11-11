@@ -1,10 +1,10 @@
-import instance from './axios';
-import { getSpec } from './openapi';
+import instance from './axios.js';
 
-const CATEGORIES_PATH = '/api/categories';
-
-export async function listCategories() {
-  await getSpec();
-  const res = await instance.get(CATEGORIES_PATH);
-  return res.data; // Category[]
+/**
+ * GET /api/categories
+ * Public categories list
+ */
+export async function fetchCategories() {
+  const res = await instance.get('/api/categories');
+  return res.data;
 }
