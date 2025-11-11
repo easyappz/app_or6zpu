@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { login as apiLogin } from '../api/auth';
 import { getMe as apiGetMe } from '../api/members';
 
-const AuthContext = createContext({
+export const AuthContext = createContext({
   token: null,
   member: null,
   loading: false,
