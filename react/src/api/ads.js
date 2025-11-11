@@ -1,83 +1,45 @@
-import { getSpec, findOperationPath, requestBySpec } from './spec';
+import instance from './axios';
+import { getSpec } from './openapi';
 
-export async function listAds(filters = {}) {
+// Ensure we respect OpenAPI-defined params
+const ADS_LIST_PATH = '/api/ads';
+
+export async function listAds(params = {}) {
+  // Validate against spec minimally (keys only)
   await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Ads',
-    method: 'get',
-    summary: 'Поиск и список объявлений',
-  });
-  const res = await requestBySpec({ method: 'get', path, query: filters, op });
-  return res.data;
+  const allowed = [
+    'page',
+    'page_size',
+    'category_id',
+    'price_min',
+    'price_max',
+    'date_from',
+    'date_to',
+    'location',
+    'q',
+    'ordering',
+  ];
+  const query = {};
+  for (const key of allowed) {
+    const v = params[key];
+    if (v !== undefined && v !== null && String(v).length > 0) {
+      query[key] = v;
+    }
+  }
+  const res = await instance.get(ADS_LIST_PATH, { params: query });
+  return res.data; // PaginatedAdList
 }
 
-export async function getAd(id) {
-  if (id === undefined || id === null) throw new Error('id is required');
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Ads',
-    method: 'get',
-    summary: 'Получить объявление',
-  });
-  const res = await requestBySpec({ method: 'get', path, pathParams: { pk: id }, op });
-  return res.data;
+export async function addFavorite(adId) {
+  if (!adId) throw new Error('adId is required');
+  const url = `/api/ads/${adId}/favorite`;
+  const res = await instance.post(url);
+  return res.status; // 204 expected
 }
 
-export async function createAd(data) {
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Ads',
-    method: 'post',
-    summary: 'Создать объявление',
-  });
-  const res = await requestBySpec({ method: 'post', path, body: data, op });
-  return res.data;
-}
-
-export async function updateAd(id, data) {
-  if (id === undefined || id === null) throw new Error('id is required');
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Ads',
-    method: 'put',
-    summary: 'Обновить объявление',
-  });
-  const res = await requestBySpec({ method: 'put', path, pathParams: { pk: id }, body: data, op });
-  return res.data;
-}
-
-export async function deleteAd(id) {
-  if (id === undefined || id === null) throw new Error('id is required');
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Ads',
-    method: 'delete',
-    summary: 'Удалить объявление',
-  });
-  const res = await requestBySpec({ method: 'delete', path, pathParams: { pk: id }, op });
-  return res.status;
-}
-
-export async function favoriteAd(id) {
-  if (id === undefined || id === null) throw new Error('id is required');
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Ads',
-    method: 'post',
-    summary: 'Добавить в избранное',
-  });
-  const res = await requestBySpec({ method: 'post', path, pathParams: { pk: id }, op });
-  return res.status;
-}
-
-export async function unfavoriteAd(id) {
-  if (id === undefined || id === null) throw new Error('id is required');
-  await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Ads',
-    method: 'delete',
-    summary: 'Удалить из избранного',
-  });
-  const res = await requestBySpec({ method: 'delete', path, pathParams: { pk: id }, op });
-  return res.status;
+export async function removeFavorite(adId) {
+  if (!adId) throw new Error('adId is required');
+  const url = `/api/ads/${adId}/favorite`;
+  const res = await instance.delete(url);
+  return res.status; // 204 expected
 }

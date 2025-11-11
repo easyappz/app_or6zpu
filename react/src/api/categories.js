@@ -1,12 +1,10 @@
-import { getSpec, findOperationPath, requestBySpec } from './spec';
+import instance from './axios';
+import { getSpec } from './openapi';
+
+const CATEGORIES_PATH = '/api/categories';
 
 export async function listCategories() {
   await getSpec();
-  const { path, op } = await findOperationPath({
-    tag: 'Categories',
-    method: 'get',
-    summary: 'Список категорий',
-  });
-  const res = await requestBySpec({ method: 'get', path, op });
-  return res.data;
+  const res = await instance.get(CATEGORIES_PATH);
+  return res.data; // Category[]
 }
