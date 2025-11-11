@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login as apiLogin } from '../api/auth';
-import { getMe as apiGetMe } from '../api/members';
+import { loginUser as apiLogin } from '../api/auth.js';
+import { getMe as apiGetMe } from '../api/members.js';
 
 export const AuthContext = createContext({
   token: null,
