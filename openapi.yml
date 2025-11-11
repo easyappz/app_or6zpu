@@ -1,46 +1,647 @@
 openapi: 3.0.3
 info:
-  title: Easyapp API
+  title: Classifieds Board API
   version: 1.0.0
-  description: API documentation for easyapp
+  description: |
+    Русскоязычное API для доски объявлений: регистрация/авторизация по JWT,
+    профиль, категории, объявления, избранное и пагинация.
+servers:
+  - url: /
+tags:
+  - name: Auth
+    description: Авторизация и регистрация
+  - name: Members
+    description: Профили пользователей (участников)
+  - name: Categories
+    description: Категории объявлений
+  - name: Ads
+    description: Управление объявлениями и поиск
 paths:
-  /api/hello/:
-    get:
-      operationId: api_hello_retrieve
-      description: Get a hello world message
-      tags:
-      - api
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Регистрация нового пользователя
+      description: Создаёт учетную запись. Авторизация не требуется.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
       responses:
-        '200':
+        '201':
+          description: Пользователь создан
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Message'
-          description: ''
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Сообщение об успешной регистрации
+                required: [message]
+        '400':
+          description: Ошибка валидации входных данных
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Вход по email и паролю
+      description: Возвращает JWT-токен доступа. Авторизация не требуется.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Неверные учётные данные
+  /api/members/me:
+    get:
+      tags: [Members]
+      summary: Текущий профиль
+      description: Возвращает данные текущего участника (по токену).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Данные профиля
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          description: Требуется авторизация
+    put:
+      tags: [Members]
+      summary: Обновить профиль
+      description: Обновляет поля профиля текущего участника.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberUpdate'
+      responses:
+        '200':
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          description: Требуется авторизация
+  /api/categories:
+    get:
+      tags: [Categories]
+      summary: Список категорий
+      description: Публичный список категорий объявлений.
+      responses:
+        '200':
+          description: Список категорий
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+  /api/ads:
+    get:
+      tags: [Ads]
+      summary: Поиск и список объявлений
+      description: Публичный список с пагинацией и фильтрами.
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+          description: Номер страницы (пагинация)
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 200 }
+          description: Размер страницы (количество элементов)
+        - in: query
+          name: category_id
+          schema: { type: integer }
+          description: Фильтр по категории
+        - in: query
+          name: price_min
+          schema: { type: number, format: float, minimum: 0 }
+          description: Минимальная цена
+        - in: query
+          name: price_max
+          schema: { type: number, format: float, minimum: 0 }
+          description: Максимальная цена
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+          description: Показать объявления, созданные начиная с этой даты
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+          description: Показать объявления, созданные до этой даты (включительно)
+        - in: query
+          name: location
+          schema: { type: string }
+          description: Фильтр по местоположению (строка)
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Поиск по ключевым словам (заголовок/описание)
+        - in: query
+          name: ordering
+          schema:
+            type: string
+            enum: [-created_at, created_at, price, -price]
+          description: Сортировка: по дате (возр/убыв) или по цене (возр/убыв)
+      responses:
+        '200':
+          description: Пагинированный список объявлений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdList'
+    post:
+      tags: [Ads]
+      summary: Создать объявление
+      description: Доступно только авторизованным пользователям.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdCreate'
+      responses:
+        '201':
+          description: Объявление создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ad'
+        '401':
+          description: Требуется авторизация
+  /api/ads/{id}:
+    get:
+      tags: [Ads]
+      summary: Получить объявление
+      description: Публичное получение одного объявления по ID.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+          description: Идентификатор объявления
+      responses:
+        '200':
+          description: Объявление
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ad'
+        '404':
+          description: Не найдено
+    put:
+      tags: [Ads]
+      summary: Обновить объявление
+      description: Только владелец объявления. Требуется авторизация.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+          description: Идентификатор объявления
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdUpdate'
+      responses:
+        '200':
+          description: Обновлённое объявление
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ad'
+        '401':
+          description: Требуется авторизация
+        '403':
+          description: Нет прав (не владелец)
+        '404':
+          description: Не найдено
+    delete:
+      tags: [Ads]
+      summary: Удалить объявление
+      description: Только владелец объявления. Требуется авторизация.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+          description: Идентификатор объявления
+      responses:
+        '204':
+          description: Удалено, без содержимого
+        '401':
+          description: Требуется авторизация
+        '403':
+          description: Нет прав (не владелец)
+        '404':
+          description: Не найдено
+  /api/ads/{id}/favorite:
+    post:
+      tags: [Ads]
+      summary: Добавить в избранное
+      description: Помечает объявление как избранное для текущего пользователя.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+          description: Идентификатор объявления
+      responses:
+        '204':
+          description: Добавлено в избранное (без содержимого)
+        '401':
+          description: Требуется авторизация
+        '404':
+          description: Не найдено
+    delete:
+      tags: [Ads]
+      summary: Удалить из избранного
+      description: Снимает отметку избранного для текущего пользователя.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+          description: Идентификатор объявления
+      responses:
+        '204':
+          description: Удалено из избранного (без содержимого)
+        '401':
+          description: Требуется авторизация
+        '404':
+          description: Не найдено
+  /api/members/me/ads:
+    get:
+      tags: [Members]
+      summary: Мои объявления
+      description: Пагинированный список объявлений текущего пользователя.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+          description: Номер страницы
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 200 }
+          description: Размер страницы
+      responses:
+        '200':
+          description: Пагинированный список объявлений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdList'
+        '401':
+          description: Требуется авторизация
+  /api/members/me/favorites:
+    get:
+      tags: [Members]
+      summary: Мои избранные объявления
+      description: Пагинированный список избранных объявлений текущего пользователя.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+          description: Номер страницы
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 200 }
+          description: Размер страницы
+      responses:
+        '200':
+          description: Пагинированный список избранных объявлений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdList'
+        '401':
+          description: Требуется авторизация
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
-    Message:
+    Member:
       type: object
+      description: Участник (профиль пользователя)
       properties:
-        message:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный идентификатор участника
+          readOnly: true
+        name:
           type: string
-          maxLength: 200
-        timestamp:
+          description: Имя пользователя
+        email:
+          type: string
+          format: email
+          description: Электронная почта
+        phone:
+          type: string
+          description: Телефон
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          description: URL аватара
+        created_at:
           type: string
           format: date-time
+          description: Дата создания профиля
+          readOnly: true
+      required: [id, name, email, created_at]
+    MemberUpdate:
+      type: object
+      description: Поля для обновления профиля
+      properties:
+        name:
+          type: string
+          description: Имя пользователя
+        phone:
+          type: string
+          description: Телефон
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          description: URL аватара
+    AuthRegisterRequest:
+      type: object
+      description: Данные для регистрации
+      properties:
+        name:
+          type: string
+          description: Имя пользователя
+        email:
+          type: string
+          format: email
+          description: Электронная почта
+        phone:
+          type: string
+          description: Телефон
+        password:
+          type: string
+          format: password
+          minLength: 6
+          description: Пароль
+      required: [name, email, phone, password]
+    AuthLoginRequest:
+      type: object
+      description: Данные для входа
+      properties:
+        email:
+          type: string
+          format: email
+          description: Электронная почта
+        password:
+          type: string
+          format: password
+          description: Пароль
+      required: [email, password]
+    AuthTokenResponse:
+      type: object
+      description: Ответ с токеном доступа
+      properties:
+        access:
+          type: string
+          description: JWT токен доступа
+        token_type:
+          type: string
+          description: Тип токена (всегда bearer)
+          example: bearer
+        expires_in:
+          type: integer
+          description: Время жизни токена в секундах
+      required: [access, token_type, expires_in]
+    Category:
+      type: object
+      description: Категория объявлений
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный идентификатор категории
+          readOnly: true
+        name:
+          type: string
+          description: Название категории
+        slug:
+          type: string
+          description: ЧПУ-идентификатор
+        parent_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: ID родительской категории (если есть)
+      required: [id, name, slug]
+    Ad:
+      type: object
+      description: Объявление
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный идентификатор объявления
+          readOnly: true
+        title:
+          type: string
+          description: Заголовок
+        description:
+          type: string
+          description: Описание
+        price:
+          type: number
+          format: float
+          minimum: 0
+          description: Цена
+        photos:
+          type: array
+          description: Список URL фотографий
+          items:
+            type: string
+            format: uri
+        location:
+          type: string
+          description: Местоположение
+        contact:
+          type: string
+          description: Контактные данные
+        condition:
+          type: string
+          description: Состояние товара
+          enum: [new, like_new, used, for_parts]
+        category_id:
+          type: integer
+          format: int64
+          description: ID категории
+        owner_id:
+          type: integer
+          format: int64
+          description: ID владельца объявления
+          readOnly: true
+        is_favorite:
+          type: boolean
+          description: Признак, что объявление в избранном у текущего пользователя
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          description: Дата создания
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: Дата обновления
           readOnly: true
       required:
-      - message
-      - timestamp
-  securitySchemes:
-    basicAuth:
-      type: http
-      scheme: basic
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: sessionid
+        - id
+        - title
+        - description
+        - price
+        - photos
+        - location
+        - contact
+        - condition
+        - category_id
+        - owner_id
+        - is_favorite
+        - created_at
+        - updated_at
+    AdCreate:
+      type: object
+      description: Данные для создания объявления
+      properties:
+        title:
+          type: string
+          description: Заголовок
+        description:
+          type: string
+          description: Описание
+        price:
+          type: number
+          format: float
+          minimum: 0
+          description: Цена
+        photos:
+          type: array
+          description: Список URL фотографий
+          items:
+            type: string
+            format: uri
+        location:
+          type: string
+          description: Местоположение
+        contact:
+          type: string
+          description: Контактные данные
+        condition:
+          type: string
+          description: Состояние товара
+          enum: [new, like_new, used, for_parts]
+        category_id:
+          type: integer
+          format: int64
+          description: ID категории
+      required:
+        - title
+        - description
+        - price
+        - location
+        - contact
+        - condition
+        - category_id
+    AdUpdate:
+      type: object
+      description: Данные для обновления объявления (те же поля, что и при создании)
+      properties:
+        title:
+          type: string
+          description: Заголовок
+        description:
+          type: string
+          description: Описание
+        price:
+          type: number
+          format: float
+          minimum: 0
+          description: Цена
+        photos:
+          type: array
+          description: Список URL фотографий
+          items:
+            type: string
+            format: uri
+        location:
+          type: string
+          description: Местоположение
+        contact:
+          type: string
+          description: Контактные данные
+        condition:
+          type: string
+          description: Состояние товара
+          enum: [new, like_new, used, for_parts]
+        category_id:
+          type: integer
+          format: int64
+          description: ID категории
+    PaginatedAdList:
+      type: object
+      description: Пагинированный список объявлений
+      properties:
+        count:
+          type: integer
+          description: Общее число элементов
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: URL следующей страницы или null
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: URL предыдущей страницы или null
+        results:
+          type: array
+          description: Список объявлений на текущей странице
+          items:
+            $ref: '#/components/schemas/Ad'
+      required: [count, next, previous, results]
