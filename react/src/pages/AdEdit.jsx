@@ -166,7 +166,7 @@ function AdEdit() {
           {serverError}
         </div>
       )}
-      <form data-easytag="id2-form-src/pages/AdEdit.jsx" onSubmit={onSubmit} style={{ display: 'grid', gap: 16 }}>
+      <form data-easytag="id3-src/pages/AdEdit.jsx" onSubmit={onSubmit} style={{ display: 'grid', gap: 16 }}>
         <div>
           <label htmlFor="title" style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>Заголовок</label>
           <input id="title" type="text" value={form.title} onChange={(ev) => updateField('title', ev.target.value)} placeholder="Например: iPhone 13, 128 ГБ" style={inputStyle} />

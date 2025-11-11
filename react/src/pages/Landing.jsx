@@ -74,7 +74,6 @@ export default function Landing() {
 
   const onApply = () => {
     setPage(1);
-    // useEffect(applyFilters) will run because dependencies contain filters and page
     applyFilters();
   };
 
@@ -92,7 +91,7 @@ export default function Landing() {
     setPage(1);
   };
 
-  const onToggleFavorite = async (ad) {
+  const onToggleFavorite = async (ad) => {
     if (!isAuth) {
       navigate('/login');
       return;
@@ -120,12 +119,12 @@ export default function Landing() {
 
   return (
     <section data-easytag="id1-src/pages/Landing.jsx" className="landing-wrap">
-      <header className="header-row" data-easytag="id1.0-src/pages/Landing.jsx">
+      <header className="header-row" data-easytag="id2-src/pages/Landing.jsx">
         <h2 style={{ margin: 0 }}>Объявления</h2>
         <div className="meta">Найдено: {data.count}</div>
       </header>
 
-      <div className="filters-bar" data-easytag="id1.1-src/pages/Landing.jsx">
+      <div className="filters-bar" data-easytag="id3-src/pages/Landing.jsx">
         <div className="field">
           <label htmlFor="category">Категория</label>
           <select
@@ -192,21 +191,6 @@ export default function Landing() {
           />
         </div>
 
-        <div className="field">
-          <label htmlFor="ordering">Сортировка</label>
-          <select
-            id="ordering"
-            value={filters.ordering}
-            onChange={(e) => handleChange('ordering', e.target.value)}
-            aria-label="Сортировка"
-          >
-            <option value="-created_at">Новые сначала</option>
-            <option value="price">Дешевле</option>
-            <option value="-price">Дороже</option>
-            <option value="created_at">Старые сначала</option>
-          </select>
-        </div>
-
         <div className="field" style={{ minWidth: 220, flex: 1 }}>
           <label htmlFor="location">Местоположение</label>
           <input
@@ -231,7 +215,7 @@ export default function Landing() {
           />
         </div>
 
-        <div className="filters-actions" data-easytag="id1.2-src/pages/Landing.jsx">
+        <div className="filters-actions" data-easytag="id4-src/pages/Landing.jsx">
           <button type="button" onClick={onApply} style={{ fontWeight: 600 }}>
             Применить
           </button>
@@ -242,12 +226,12 @@ export default function Landing() {
       </div>
 
       {error && (
-        <div data-easytag="id1.3-src/pages/Landing.jsx" style={{ color: '#b00020', padding: '8px 0' }}>
+        <div data-easytag="id5-src/pages/Landing.jsx" style={{ color: '#b00020', padding: '8px 0' }}>
           {error}
         </div>
       )}
 
-      <div data-easytag="id1.4-src/pages/Landing.jsx" className="grid" aria-live="polite">
+      <div data-easytag="id6-src/pages/Landing.jsx" className="grid" aria-live="polite">
         {loading ? (
           <div style={{ textAlign: 'center', padding: 24, gridColumn: '1/-1' }}>Загрузка…</div>
         ) : (
@@ -260,7 +244,7 @@ export default function Landing() {
         )}
       </div>
 
-      <div data-easytag="id1.5-src/pages/Landing.jsx">
+      <div data-easytag="id7-src/pages/Landing.jsx">
         <Pagination
           page={page}
           pageSize={pageSize}

@@ -169,7 +169,7 @@ export default function AdView() {
               disabled={favLoading}
               style={{ width: '100%', height: 44, borderRadius: 10, border: '1px solid #1d1d1f', background: ad.is_favorite ? '#1d1d1f' : '#fff', color: ad.is_favorite ? '#fff' : '#1d1d1f', cursor: 'pointer', marginBottom: 8 }}
               aria-label="favorite-toggle"
-              data-easytag="id13fav-src/pages/AdView.jsx"
+              data-easytag="id14-src/pages/AdView.jsx"
             >
               {ad.is_favorite ? 'Убрать из избранного' : 'В избранное'}
             </button>
