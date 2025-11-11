@@ -12,7 +12,8 @@ from .views import (
     RegisterView,
 )
 
-router = DefaultRouter()
+# Ensure router paths have no trailing slash to match openapi.yml
+router = DefaultRouter(trailing_slash="")
 router.register(r"categories", CategoryViewSet, basename="category")
 router.register(r"ads", AdViewSet, basename="ad")
 
