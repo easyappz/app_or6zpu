@@ -56,7 +56,7 @@ const styles = {
     color: '#111',
     textDecoration: 'none',
     padding: '10px 16px',
-    border: '1px solid #e9e9e9',
+    border: '1px solid '#e9e9e9',
     borderRadius: 9999,
     background: '#f9f9f9',
     lineHeight: 1,
@@ -131,8 +131,8 @@ export default function Header() {
     async function fetchMe() {
       if (!hasToken || member) return;
       try {
-        const me = await getMe();
-        if (!cancelled) setMember(me);
+        const meRes = await getMe();
+        if (!cancelled) setMember(meRes?.data || null);
       } catch (e) {
         // Token invalid — ensure logged-out UI
         if (!cancelled) setMember(null);
